@@ -1,26 +1,53 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta http-equiv="X-UA-Compatible" content="IE=edge">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
-</head>
-<body>
+const express = require("express");
+const app = express();
+const port = 3000;
+const path = require("path");
+const mongoose = require("mongoose");
+const Movie = require("./models/Movie");
+const axios = require("axios");
 
-    <h1> Movies Recommendation</h1>
+mongoose
+  .connect("mongodb://127.0.0.1:27017/movies-recomm")
+  .then(() => console.log("connection open!"))
+  .catch((err) => console.log(err));
 
-  
-    <label for="search"> Search Movie </label>
-    <input type="text" placeholder="search movieshere..." id="searchinput">
+app.set("view engine", "ejs");
+app.set("views", path.join(__dirname, "views"));
+app.use(express.static(path.join(__dirname, "public")));
+app.use(express.urlencoded({extended:true}))
 
+app.get("/",async (req, res) => {
+  const movies = await Movie.find({});
+  res.render("index", { movies });
+});
 
-    
+app.post("/",async (req, res) => {
+  const {searchText} = req.body;
+  console.log(searchText);
+  await Movie.deleteMany({});
+  axios
+    .get(`https://api.tvmaze.com/search/shows?q=${searchText}`)
+    .then((result) => {
+      let movies = result.data;
+      movies.forEach((movie) => {
+        if (movie.show.image !== null && movie.show.runtime) {
+          Movie.create({
+            name: movie.show.name,
+            runtime: movie.show.runtime,
+            year: movie.show.premiered,
+            image: movie.show.image.medium,
+          });
+        }
+      });
 
-    <section id="section"></section>
+      res.redirect("/");
+    })
+    .catch((err) => {
+      console.log(err);
+      
+    });
+});
 
-
-
- <script src="/public/main.js"></script>   
-</body>
-</html>
+app.listen(port, () =>
+  console.log(`Example app listening at http://localhost:3000`)
+);
